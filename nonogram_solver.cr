@@ -1,6 +1,7 @@
 require "matrix"
 
-enum Cell
+
+enum Cell : UInt8
   Unknown, Empty, Full,
   UnknownMark, EmptyMark, FullMark
 
@@ -18,17 +19,45 @@ enum Cell
   end
 end
 
-class Field < Matrix(Cell)
+
+class Field
+  include Enumerable(Cell)
+
   def initialize(@row_hints : Array(Array(Int)), @col_hints : Array(Array(Int)))
-    super(@row_hints.size, @col_hints.size, Cell::Unknown)
+    @rows = Array.new(height) { Array.new(width, Cell::Unknown) }
+    @cols = Array.new(width) { Array.new(height, Cell::Unknown) }
   end
-  getter col_hints, row_hints
+  getter row_hints, col_hints
+  getter rows, cols
 
   def width
     @col_hints.size
   end
   def height
     @row_hints.size
+  end
+
+#   def [](row : Int, col : Int) : Cell
+#     @rows[row][col]
+#   end
+#   def []=(row : Int, col : Int, value : Cell)
+#     @rows[row][col] = value
+#     @cols[col][row] = value
+#   end
+
+  def each_with_index
+    @rows.each_with_index do |row, row_i|
+      row.each_with_index do |c, col_i|
+        yield c, row_i, col_i
+      end
+    end
+  end
+  def each
+    @rows.each do |row|
+      row.each do |c|
+        yield c
+      end
+    end
   end
 
   def to_s
@@ -97,9 +126,9 @@ class Field < Matrix(Cell)
   def solve!
     loop do
       any_lines = false
-      {% for rows? in {true, false} %}
-        {% if rows? %}rows{% else %}columns{% end %}.each_with_index do |line, line_i|
-          hints = {% if rows? %}@row_hints{% else %}@col_hints{% end %}[line_i]
+      {% for line in {:row, :col} %}
+        @{{line.id}}s.each_with_index do |line, line_i|
+          hints = @{{line.id}}_hints[line_i]
           placements(hints, line.size, [] of Int32) do |placement|
             correct = true
             placement_with_indices(placement, hints, line.size) do |c, i|
@@ -120,22 +149,20 @@ class Field < Matrix(Cell)
               end
             end
           end
-          any_cells = false
           line.each_with_index do |c, i|
-            if c.mark? && c != Cell::UnknownMark
-              any_cells = true
-              {% if rows? %}
-                self[line_i, i] = c.unmark
-              {% else %}
-                self[i, line_i] = c.unmark
-              {% end %}
+            if c.mark?
+              if c != Cell::UnknownMark
+                any_lines = true
+                line[i] = c.unmark
+                {% if line == :row %}col{% else %}row{% end %}s[i][line_i] = c.unmark
+              else
+                line[i] = Cell::Unknown
+              end
             end
           end
-          if any_cells
-            any_lines = true
-            yield
-          end
         end
+
+        yield if any_lines
       {% end %}
       break unless any_lines
     end
