@@ -1,97 +1,34 @@
 require "matrix"
 
 enum Cell
-  Unknown = -1, Empty, Full
+  Unknown, Empty, Full,
+  UnknownMark, EmptyMark, FullMark
+
+  def mark
+    mark? ? self : Cell.new(value + 3)
+  end
+  def unmark
+    mark? ? Cell.new(value - 3) : self
+  end
+  def mark?
+    self >= UnknownMark
+  end
+  def known?
+    self == Empty || self == Full
+  end
 end
 
 class Field < Matrix(Cell)
   def initialize(@row_hints : Array(Array(Int)), @col_hints : Array(Array(Int)))
     super(@row_hints.size, @col_hints.size, Cell::Unknown)
-#     @cells = Array(Cell).new(width*height, Cell::Unknown)
   end
   getter col_hints, row_hints
 
-#   getter cells
   def width
     @col_hints.size
   end
   def height
     @row_hints.size
-  end
-
-  abstract struct Line
-    abstract def initialize(field : Field, index : Int)
-    abstract def [](index : Int) : Cell
-    abstract def []=(index : Int, value : Cell) : Void
-    abstract def size : Int
-    abstract def hints : Array(Int)
-    def each : Cell
-      (0...size).each do |i|
-        yield self[i]
-      end
-    end
-    def to_a : Array(Cell)
-      Array.new(size) { |i| self[i] }
-    end
-  end
-
-  struct Row < Line
-    def initialize(@field : Field, index : Int)
-      @start = field.width * index
-      @size = field.width
-      @hints = @field.row_hints[index]
-    end
-    def [](index : Int)
-      @field[@start + index]
-    end
-    def []=(index : Int, value : Cell)
-      @field[@start + index] = value
-    end
-    getter size
-    getter hints
-    def each : Cell
-      (@start ... @start+size).each do |i|
-        yield @field[i]
-      end
-    end
-  end
-
-  struct Col < Line
-    def initialize(@field : Field, index : Int)
-      @start = index
-      @size = field.height
-      @hints = @field.col_hints[index]
-    end
-    def [](index : Int)
-      @field[@start + @field.width*index]
-    end
-    def []=(index : Int, value : Cell)
-      @field[@start + @field.width*index] = value
-    end
-    getter size
-    getter hints
-    def each : Cell
-      index = @start
-      (0 ... size).each do |i|
-        yield @field[index]
-        index += @field.width
-      end
-    end
-    def to_a : Array(Cell)
-      index = @start
-      Array.new(size) { |i|
-        c = @field[index]
-        index += @field.width
-        c
-      }
-    end
-  end
-
-  def row(index : Int)
-    Row.new(self, index)
-  end
-  def col(index : Int)
-    Col.new(self, index)
   end
 
   def to_s
@@ -158,48 +95,49 @@ class Field < Matrix(Cell)
   end
 
   def solve!
-    yield
-    undecided = Cell.new(12345)
-    any = true
-    while any
-      any = false
-      {:rows, :cols}.each do |kind|
-        (0 ... (kind == :rows ? height : width)).each do |i|
-          fline = kind == :rows ? row i : col i
-          line, hints = fline.to_a, fline.hints
+    loop do
+      any_lines = false
+      {% for rows? in {true, false} %}
+        {% if rows? %}rows{% else %}columns{% end %}.each_with_index do |line, line_i|
+          hints = {% if rows? %}@row_hints{% else %}@col_hints{% end %}[line_i]
           placements(hints, line.size, [] of Int32) do |placement|
             correct = true
             placement_with_indices(placement, hints, line.size) do |c, i|
-              if fline[i] != Cell::Unknown
-                if c != fline[i]
-                  correct = false
-                  break
-                end
+              if line[i].known? && c != line[i]
+                correct = false
+                break
               end
             end
             if correct
               placement_with_indices(placement, hints, line.size) do |c, i|
-                if fline[i] == Cell::Unknown
+                if !line[i].known?
                   if line[i] == Cell::Unknown
-                    line[i] = c
-                  elsif line[i] != c
-                    line[i] = undecided
+                    line[i] = c.mark
+                  elsif line[i] != c.mark
+                    line[i] = Cell::UnknownMark
                   end
                 end
               end
             end
           end
-          y = false
+          any_cells = false
           line.each_with_index do |c, i|
-            if c != undecided && fline[i] != c
-              y = any = true
-              fline[i] = c
+            if c.mark? && c != Cell::UnknownMark
+              any_cells = true
+              {% if rows? %}
+                self[line_i, i] = c.unmark
+              {% else %}
+                self[i, line_i] = c.unmark
+              {% end %}
             end
           end
-          yield if y
-          #break
+          if any_cells
+            any_lines = true
+            yield
+          end
         end
-      end
+      {% end %}
+      break unless any_lines
     end
   end
 end
@@ -216,6 +154,7 @@ rows, cols = File.read_lines(ARGV[0]).select { |line|
 
 field = Field.new(rows, cols)
 field.solve! do
-  puts field.to_s
+  puts; puts field.to_s
+  print "#{100 * field.count &.known? / field.size}%\r"
 end
-
+puts; puts field.to_s
