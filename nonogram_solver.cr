@@ -1,6 +1,3 @@
-require "matrix"
-
-
 enum Cell : UInt8
   Unknown, Empty, Full,
   UnknownMark, EmptyMark, FullMark
@@ -23,12 +20,12 @@ end
 class Field
   include Enumerable(Cell)
 
-  def initialize(@row_hints : Array(Array(Int)), @col_hints : Array(Array(Int)))
+  def initialize(@row_hints : Array(Array(Int32)), @col_hints : Array(Array(Int32)))
     @rows = Array.new(height) { Array.new(width, Cell::Unknown) }
     @cols = Array.new(width) { Array.new(height, Cell::Unknown) }
   end
   getter row_hints, col_hints
-  getter rows, cols
+  getter rows : Array(Array(Cell)), cols : Array(Array(Cell))
 
   def width
     @col_hints.size
@@ -66,17 +63,17 @@ class Field
         line.map(&.to_s).join(' ').size
       } .max
     }
-    result = Matrix.new(dy + height, dx + width*2, ' ')
+    result = Array.new(dy + height) { Array.new(dx + width*2) { ' ' } }
     @row_hints.each_with_index do |line, row|
       s = line.map(&.to_s).join(' ')
       s.each_char_with_index do |c, i|
-        result[dy + row, dx - s.size + i] = c
+        result[dy + row][dx - s.size + i] = c
       end
     end
     @col_hints.each_with_index do |line, col|
       s = line.map(&.to_s).join(' ')
       s.each_char_with_index do |c, i|
-        result[dy - s.size + i, dx + 1 + col*2] = c
+        result[dy - s.size + i][dx + 1 + col*2] = c
       end
     end
     each_with_index do |c, row, col|
@@ -88,9 +85,9 @@ class Field
         else
           next
       end
-      result[dy + row, dx + col*2], result[dy + row, dx + col*2 + 1] = out
+      result[dy + row][dx + col*2], result[dy + row][dx + col*2 + 1] = out
     end
-    result.rows.map(&.join).join('\n')
+    result.map(&.join).join('\n')
   end
 
   private def placements(hints : Array(Int), size : Int,
