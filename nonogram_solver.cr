@@ -10,6 +10,10 @@ end
 class Field
   include Enumerable(Cell)
 
+  enum State
+    Solved, CantSolve, Invalid
+  end
+
   def initialize(@row_hints : Array(Array(Int32)), @col_hints : Array(Array(Int32)))
     @rows = Array.new(height) { Array.new(width, Cell::Unknown) }
     @cols = Array.new(width) { Array.new(height, Cell::Unknown) }
@@ -114,10 +118,11 @@ class Field
     end
   end
 
-  def solve!
+  def solve! : State
     todo = Set({Int32, Int32}).new
     height.times { |i| todo << {i, -1} }
     width.times { |i| todo << {-1, i} }
+
     until todo.empty?
       todo_item = todo.first
       todo.delete todo_item
@@ -129,15 +134,17 @@ class Field
       end
 
       try = line.map { |c| c.known? ? c : Cell::Pending }
+      any_possible = false
       placements(hints, line.size, [] of Int32) do |placement|
-        correct = true
+        possible = true
         placement_with_indices(placement, hints, line.size) do |c, i|
           if c != line[i] != Cell::Unknown
-            correct = false
+            possible = false
             break
           end
         end
-        if correct
+        if possible
+          any_possible = true
           placement_with_indices(placement, hints, line.size) do |c, i|
             if line[i] == Cell::Unknown
               if try[i] == Cell::Pending
@@ -149,6 +156,7 @@ class Field
           end
         end
       end
+      return State::Invalid if !any_possible
 
       any = false
       try.each_with_index do |c, i|
@@ -165,6 +173,13 @@ class Field
       end
       yield if any
     end
+
+    each do |c|
+      unless c.known?
+        return State::CantSolve
+      end
+    end
+    return State::Solved
   end
 end
 
@@ -179,7 +194,7 @@ rows, cols = File.read_lines(ARGV[0]).select { |line|
 
 
 field = Field.new(rows, cols)
-field.solve! do
-  puts; puts field.to_s
+puts field.solve! {
+  puts; puts field
   print "#{100 * field.count &.known? / field.size}%\r"
-end
+}
