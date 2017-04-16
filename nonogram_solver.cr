@@ -9,6 +9,7 @@ end
 
 class Field
   include Enumerable(Cell)
+  def_clone
 
   enum State
     Solved, CantSolve, Invalid
@@ -118,60 +119,101 @@ class Field
     end
   end
 
-  def solve! : State
+  {% for yld in [true, false] %}
+  def solve!(complex = true) : State
     todo = Set({Int32, Int32}).new
     height.times { |i| todo << {i, -1} }
     width.times { |i| todo << {-1, i} }
+    contr_todo = Array({Int32, Int32, Cell}).new
 
-    until todo.empty?
-      todo_item = todo.first
-      todo.delete todo_item
-      row_i, col_i = todo_item
-      if row_i > 0
-        line, hints = @rows[row_i], @row_hints[row_i]
-      else
-        line, hints = @cols[col_i], @col_hints[col_i]
-      end
-
-      try = line.map { |c| c.known? ? c : Cell::Pending }
-      any_possible = false
-      placements(hints, line.size, [] of Int32) do |placement|
-        possible = true
-        placement_with_indices(placement, hints, line.size) do |c, i|
-          if c != line[i] != Cell::Unknown
-            possible = false
-            break
-          end
+    loop do
+      until todo.empty?
+        todo_item = todo.first
+        todo.delete todo_item
+        row_i, col_i = todo_item
+        if row_i > 0
+          line, hints = @rows[row_i], @row_hints[row_i]
+        else
+          line, hints = @cols[col_i], @col_hints[col_i]
         end
-        if possible
-          any_possible = true
+
+        try = line.map { |c| c.known? ? c : Cell::Pending }
+        any_possible = false
+        placements(hints, line.size, [] of Int32) do |placement|
+          possible = true
           placement_with_indices(placement, hints, line.size) do |c, i|
-            if line[i] == Cell::Unknown
-              if try[i] == Cell::Pending
-                try[i] = c
-              elsif try[i] != c
-                try[i] = Cell::Unknown
+            if c != line[i] != Cell::Unknown
+              possible = false
+              break
+            end
+          end
+          if possible
+            any_possible = true
+            placement_with_indices(placement, hints, line.size) do |c, i|
+              if line[i] == Cell::Unknown
+                if try[i] == Cell::Pending
+                  try[i] = c
+                elsif try[i] != c
+                  try[i] = Cell::Unknown
+                end
               end
             end
           end
         end
-      end
-      return State::Invalid if !any_possible
+        return State::Invalid if !any_possible
 
-      any = false
-      try.each_with_index do |c, i|
-        if line[i] != c && c.known?
-          if row_i > 0
-            self[row_i, i] = c
-            todo << {-1, i}
-          else
-            self[i, col_i] = c
-            todo << {i, -1}
+        any = false
+        try.each_with_index do |c, i|
+          if line[i] != c && c.known?
+            if row_i > 0
+              self[row_i, i] = c
+              todo << {-1, i}
+            else
+              self[i, col_i] = c
+              todo << {i, -1}
+            end
+            any = true
           end
-          any = true
+        end
+        if any
+          contr_todo.clear
+          {% if yld %}yield{% end %}
         end
       end
-      yield if any
+      break unless complex
+
+      if contr_todo.empty?
+        each_with_index do |c, row_i, col_i|
+          if c == Cell::Unknown
+            contr_todo << {row_i, col_i, Cell::Full} << {row_i, col_i, Cell::Empty}
+          end
+        end
+        break if contr_todo.empty?
+
+        contr_todo.sort_by! do |(row_i, col_i, c)|
+          {
+            {@rows[row_i], @row_hints[row_i]},
+            {@cols[col_i], @col_hints[col_i]},
+          }.map { |(line, hints)|
+            now = line.count c
+            total = (c == Cell::Full ? hints.sum : line.size - hints.sum)
+            now.to_f/total
+          } .sum
+        end
+      end
+
+      while todo.empty?
+        return State::CantSolve if contr_todo.empty?
+
+        row_i, col_i, fc = contr_todo.pop
+        field = clone
+        field[row_i, col_i] = fc
+        state = field.solve!(complex: false)
+        if state == State::Invalid
+          self[row_i, col_i] = (fc == Cell::Full ? Cell::Empty : Cell::Full)
+          todo << {row_i, -1} << {-1, col_i}
+        end
+      end
     end
 
     each do |c|
@@ -181,6 +223,7 @@ class Field
     end
     return State::Solved
   end
+  {% end %}
 end
 
 
