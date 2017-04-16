@@ -34,10 +34,10 @@ class Field
     @row_hints.size
   end
 
-#   def [](row : Int, col : Int) : Cell
+#   def [](row : Int32, col : Int32) : Cell
 #     @rows[row][col]
 #   end
-#   def []=(row : Int, col : Int, value : Cell)
+#   def []=(row : Int32, col : Int32, value : Cell)
 #     @rows[row][col] = value
 #     @cols[col][row] = value
 #   end
@@ -57,26 +57,26 @@ class Field
     end
   end
 
-  def to_s
+  def to_s(io)
     dx, dy = {@row_hints, @col_hints}.map { |hints|
       hints.map { |line|
         line.map(&.to_s).join(' ').size
       } .max
     }
     result = Array.new(dy + height) { Array.new(dx + width*2) { ' ' } }
-    @row_hints.each_with_index do |line, row|
+    @row_hints.each_with_index do |line, row_i|
       s = line.map(&.to_s).join(' ')
       s.each_char_with_index do |c, i|
-        result[dy + row][dx - s.size + i] = c
+        result[dy + row_i][dx - s.size + i] = c
       end
     end
-    @col_hints.each_with_index do |line, col|
+    @col_hints.each_with_index do |line, col_i|
       s = line.map(&.to_s).join(' ')
       s.each_char_with_index do |c, i|
-        result[dy - s.size + i][dx + 1 + col*2] = c
+        result[dy - s.size + i][dx + 1 + col_i*2] = c
       end
     end
-    each_with_index do |c, row, col|
+    each_with_index do |c, row_i, col_i|
       out = case c
         when Cell::Full
           "▐█"
@@ -85,14 +85,18 @@ class Field
         else
           next
       end
-      result[dy + row][dx + col*2], result[dy + row][dx + col*2 + 1] = out
+      result[dy + row_i][dx + col_i*2], result[dy + row_i][dx + col_i*2 + 1] = out
     end
-    result.map(&.join).join('\n')
+    io << result.map(&.join).join('\n')
   end
 
-  private def placements(hints : Array(Int), size : Int,
-                         placement : Array(Int), &block : Array(Int32) ->)
-    stack = placement + [placement.at(-1) { -1 } + 1 + hints[placement.size]]
+  private def placements(hints : Array(Int32), size : Int32,
+                         placement = [] of Int32, &block : Array(Int32) ->)
+    if hints.size == 0
+      yield [] of Int32
+      return
+    end
+    stack = placement + [placement.last { -1 } + 1 + hints[placement.size]]
     while stack[-1] <= size
       if stack.size == hints.size
         yield stack
@@ -103,7 +107,7 @@ class Field
     end
   end
 
-  def placement_with_indices(placement : Array(Int), hints : Array(Int), size : Int)
+  def placement_with_indices(placement : Array(Int32), hints : Array(Int32), size : Int32)
     prev_right = 0
     placement.each_with_index do |right, pi|
       left = right - hints[pi]
@@ -123,9 +127,12 @@ class Field
   def solve!
     loop do
       any_lines = false
-      {% for line in {:row, :col} %}
-        @{{line.id}}s.each_with_index do |line, line_i|
-          hints = @{{line.id}}_hints[line_i]
+      {
+        {@rows, @row_hints, @cols},
+        {@cols, @col_hints, @rows}
+      }.each do |lines, line_hints, inv_lines|
+        lines.each_with_index do |line, line_i|
+          hints = line_hints[line_i]
           placements(hints, line.size, [] of Int32) do |placement|
             correct = true
             placement_with_indices(placement, hints, line.size) do |c, i|
@@ -151,17 +158,20 @@ class Field
               if c != Cell::UnknownMark
                 any_lines = true
                 line[i] = c.unmark
-                {% if line == :row %}col{% else %}row{% end %}s[i][line_i] = c.unmark
+                inv_lines[i][line_i] = c.unmark
               else
                 line[i] = Cell::Unknown
               end
             end
           end
         end
+      end
 
-        yield if any_lines
-      {% end %}
-      break unless any_lines
+      if any_lines
+        yield
+      else
+        break
+      end
     end
   end
 end
