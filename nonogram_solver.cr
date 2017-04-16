@@ -1,18 +1,8 @@
-enum Cell : UInt8
-  Unknown, Empty, Full,
-  UnknownMark, EmptyMark, FullMark
+enum Cell : Int8
+  Pending = -2, Unknown = -1, Empty = 0, Full = 1
 
-  def mark
-    mark? ? self : Cell.new(value + 3)
-  end
-  def unmark
-    mark? ? Cell.new(value - 3) : self
-  end
-  def mark?
-    self >= UnknownMark
-  end
   def known?
-    self == Empty || self == Full
+    self >= Empty
   end
 end
 
@@ -133,35 +123,33 @@ class Field
       }.each do |lines, line_hints, inv_lines|
         lines.each_with_index do |line, line_i|
           hints = line_hints[line_i]
+          try = line.map { |c| c.known? ? c : Cell::Pending }
+
           placements(hints, line.size, [] of Int32) do |placement|
             correct = true
             placement_with_indices(placement, hints, line.size) do |c, i|
-              if line[i].known? && c != line[i]
+              if c != line[i] != Cell::Unknown
                 correct = false
                 break
               end
             end
             if correct
               placement_with_indices(placement, hints, line.size) do |c, i|
-                if !line[i].known?
-                  if line[i] == Cell::Unknown
-                    line[i] = c.mark
-                  elsif line[i] != c.mark
-                    line[i] = Cell::UnknownMark
+                if line[i] == Cell::Unknown
+                  if try[i] == Cell::Pending
+                    try[i] = c
+                  elsif try[i] != c
+                    try[i] = Cell::Unknown
                   end
                 end
               end
             end
           end
-          line.each_with_index do |c, i|
-            if c.mark?
-              if c != Cell::UnknownMark
-                any_lines = true
-                line[i] = c.unmark
-                inv_lines[i][line_i] = c.unmark
-              else
-                line[i] = Cell::Unknown
-              end
+          try.each_with_index do |c, i|
+            if line[i] != c && c.known?
+              any_lines = true
+              line[i] = c
+              inv_lines[i][line_i] = c
             end
           end
         end
