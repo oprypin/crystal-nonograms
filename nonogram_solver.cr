@@ -24,13 +24,13 @@ class Field
     @row_hints.size
   end
 
-#   def [](row : Int32, col : Int32) : Cell
-#     @rows[row][col]
-#   end
-#   def []=(row : Int32, col : Int32, value : Cell)
-#     @rows[row][col] = value
-#     @cols[col][row] = value
-#   end
+  def [](row : Int32, col : Int32) : Cell
+    @rows[row][col]
+  end
+  def []=(row : Int32, col : Int32, value : Cell)
+    @rows[row][col] = value
+    @cols[col][row] = value
+  end
 
   def each_with_index
     @rows.each_with_index do |row, row_i|
@@ -115,51 +115,55 @@ class Field
   end
 
   def solve!
-    loop do
-      any_lines = false
-      {
-        {@rows, @row_hints, @cols},
-        {@cols, @col_hints, @rows}
-      }.each do |lines, line_hints, inv_lines|
-        lines.each_with_index do |line, line_i|
-          hints = line_hints[line_i]
-          try = line.map { |c| c.known? ? c : Cell::Pending }
+    todo = Set({Int32, Int32}).new
+    height.times { |i| todo << {i, -1} }
+    width.times { |i| todo << {-1, i} }
+    until todo.empty?
+      todo_item = todo.first
+      todo.delete todo_item
+      row_i, col_i = todo_item
+      if row_i > 0
+        line, hints = @rows[row_i], @row_hints[row_i]
+      else
+        line, hints = @cols[col_i], @col_hints[col_i]
+      end
 
-          placements(hints, line.size, [] of Int32) do |placement|
-            correct = true
-            placement_with_indices(placement, hints, line.size) do |c, i|
-              if c != line[i] != Cell::Unknown
-                correct = false
-                break
-              end
-            end
-            if correct
-              placement_with_indices(placement, hints, line.size) do |c, i|
-                if line[i] == Cell::Unknown
-                  if try[i] == Cell::Pending
-                    try[i] = c
-                  elsif try[i] != c
-                    try[i] = Cell::Unknown
-                  end
-                end
-              end
-            end
+      try = line.map { |c| c.known? ? c : Cell::Pending }
+      placements(hints, line.size, [] of Int32) do |placement|
+        correct = true
+        placement_with_indices(placement, hints, line.size) do |c, i|
+          if c != line[i] != Cell::Unknown
+            correct = false
+            break
           end
-          try.each_with_index do |c, i|
-            if line[i] != c && c.known?
-              any_lines = true
-              line[i] = c
-              inv_lines[i][line_i] = c
+        end
+        if correct
+          placement_with_indices(placement, hints, line.size) do |c, i|
+            if line[i] == Cell::Unknown
+              if try[i] == Cell::Pending
+                try[i] = c
+              elsif try[i] != c
+                try[i] = Cell::Unknown
+              end
             end
           end
         end
       end
 
-      if any_lines
-        yield
-      else
-        break
+      any = false
+      try.each_with_index do |c, i|
+        if line[i] != c && c.known?
+          if row_i > 0
+            self[row_i, i] = c
+            todo << {-1, i}
+          else
+            self[i, col_i] = c
+            todo << {i, -1}
+          end
+          any = true
+        end
       end
+      yield if any
     end
   end
 end
@@ -179,4 +183,3 @@ field.solve! do
   puts; puts field.to_s
   print "#{100 * field.count &.known? / field.size}%\r"
 end
-puts; puts field.to_s
