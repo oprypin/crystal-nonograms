@@ -1,13 +1,12 @@
-enum Cell : Int8
-  Pending = -2, Unknown = -1, Empty = 0, Full = 1
+class Nonogram
+  enum Cell : Int8
+    Pending = -2, Unknown = -1, Empty = 0, Full = 1
 
-  def known?
-    self >= Empty
+    def known?
+      self >= Empty
+    end
   end
-end
 
-
-class Field
   include Enumerable(Cell)
   def_clone
 
@@ -225,19 +224,3 @@ class Field
   end
   {% end %}
 end
-
-
-rows, cols = File.read_lines(ARGV[0]).select { |line|
-  !line.strip.starts_with?('#')
-}.map { |line|
-  line.split('|').map { |part|
-    part.split.map &.to_i
-  }
-}
-
-
-field = Field.new(rows, cols)
-puts field.solve! {
-  puts; puts field
-  print "#{100 * field.count &.known? / field.size}%\r"
-}

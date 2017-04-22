@@ -1,0 +1,13 @@
+name: crystal-nonograms
+version: 0.1.0
+
+authors:
+  - Oleh Prypin <oleh@pryp.in>
+
+targets:
+  solver:
+    main: src/solver.cr
+
+crystal: 0.21.1
+
+license: MIT
