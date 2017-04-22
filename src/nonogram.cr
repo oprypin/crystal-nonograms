@@ -130,7 +130,7 @@ class Nonogram
         todo_item = todo.first
         todo.delete todo_item
         row_i, col_i = todo_item
-        if row_i > 0
+        if row_i >= 0
           line, hints = @rows[row_i], @row_hints[row_i]
         else
           line, hints = @cols[col_i], @col_hints[col_i]
@@ -164,7 +164,7 @@ class Nonogram
         any = false
         try.each_with_index do |c, i|
           if line[i] != c && c.known?
-            if row_i > 0
+            if row_i >= 0
               self[row_i, i] = c
               todo << {-1, i}
             else
