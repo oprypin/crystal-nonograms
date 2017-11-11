@@ -176,7 +176,7 @@ class Nonogram
         end
         if any
           contr_todo.clear
-          {% if yld %}yield{% end %}
+          {% if yld %}yield todo_item{% end %}
         end
       end
       break unless complex

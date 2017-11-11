@@ -1,4 +1,4 @@
-name: crystal-nonograms
+name: nonograms
 version: 0.1.0
 
 authors:
@@ -8,6 +8,6 @@ targets:
   solver:
     main: src/solver.cr
 
-crystal: 0.21.1
+crystal: 0.23.1
 
 license: MIT
