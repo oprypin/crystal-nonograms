@@ -1,6 +1,9 @@
 class Nonogram
   enum Cell : Int8
-    Pending = -2, Unknown = -1, Empty = 0, Full = 1
+    Pending = -2
+    Unknown = -1
+    Empty   =  0
+    Full    =  1
 
     def known?
       self >= Empty
@@ -11,19 +14,23 @@ class Nonogram
   def_clone
 
   enum State
-    Solved, CantSolve, Invalid
+    Solved
+    CantSolve
+    Invalid
   end
 
   def initialize(@row_hints : Array(Array(Int32)), @col_hints : Array(Array(Int32)))
     @rows = Array.new(height) { Array.new(width, Cell::Unknown) }
     @cols = Array.new(width) { Array.new(height, Cell::Unknown) }
   end
+
   getter row_hints, col_hints
   getter rows : Array(Array(Cell)), cols : Array(Array(Cell))
 
   def width
     @col_hints.size
   end
+
   def height
     @row_hints.size
   end
@@ -31,6 +38,7 @@ class Nonogram
   def [](row : Int32, col : Int32) : Cell
     @rows[row][col]
   end
+
   def []=(row : Int32, col : Int32, value : Cell)
     @rows[row][col] = value
     @cols[col][row] = value
@@ -43,6 +51,7 @@ class Nonogram
       end
     end
   end
+
   def each
     @rows.each do |row|
       row.each do |c|
@@ -55,7 +64,7 @@ class Nonogram
     dx, dy = {@row_hints, @col_hints}.map { |hints|
       hints.map { |line|
         line.map(&.to_s).join(' ').size
-      } .max
+      }.max
     }
     result = Array.new(dy + height) { Array.new(dx + width*2) { ' ' } }
     @row_hints.each_with_index do |line, row_i|
@@ -72,13 +81,13 @@ class Nonogram
     end
     each_with_index do |c, row_i, col_i|
       out = case c
-        when Cell::Full
-          "▐█"
-        when Cell::Empty
-          " ·"
-        else
-          next
-      end
+            when Cell::Full
+              "▐█"
+            when Cell::Empty
+              " ·"
+            else
+              next
+            end
       result[dy + row_i][dx + col_i*2], result[dy + row_i][dx + col_i*2 + 1] = out
     end
     io << result.map(&.join).join('\n')

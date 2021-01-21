@@ -1,6 +1,5 @@
 require "./nonogram"
 
-
 rows, cols = File.read_lines(ARGV[0]).select { |line|
   !line.strip.starts_with?('#')
 }.map { |line|
@@ -8,7 +7,6 @@ rows, cols = File.read_lines(ARGV[0]).select { |line|
     part.split.map &.to_i
   }
 }
-
 
 field = Nonogram.new(rows, cols)
 puts field.solve! {

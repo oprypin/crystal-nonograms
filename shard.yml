@@ -8,6 +8,6 @@ targets:
   solver:
     main: src/solver.cr
 
-crystal: 0.23.1
+crystal: '>= 0.23.1'
 
 license: MIT
